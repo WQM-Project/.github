@@ -124,7 +124,7 @@ flowchart TB
 | 🫧 Dissolved O₂ | DFRobot SEN0237-A | DO Concentration | 0–20 mg/L | Analog |
 | ⚡ Conductivity | DFRobot DFR0300 | EC (K=1) | 0–20 mS/cm | Analog |
 | 🔋 ORP | DFRobot SEN0165 | Redox Potential | ±2000 mV | Analog |
-| 📏 Depth | JSN-SR04T | Water Level | 20–600 cm | Trig/Echo |
+| 📏 Depth | IP68 Underwater Ultrasonic Obstacle Avoidance Sensor | Water Level | Up to 6 m | UART |
 | 🌤️ Environment | BME280 | Air Temp + Humidity + Pressure | — | I²C |
 | 📍 Location | NEO-6M / M8N | GPS Coordinates | — | UART |
 
