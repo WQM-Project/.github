@@ -6,13 +6,13 @@
 
 ### Real-Time River Water Quality Monitoring & Pollution Prediction
 
-**A solar-powered sensor boat patrols Himalayan rivers, streams readings over LoRa,<br>and forecasts pollution 24 hours before it arrives.**
+**A solar-powered sensor boat patrols Himalayan rivers, streams readings directly over 4G LTE,<br>and forecasts pollution 24 hours before it arrives.**
 
 <br>
 
 <p>
   <img src="https://img.shields.io/badge/firmware-STM32F722ZE-03234B?style=for-the-badge&logo=stmicroelectronics&logoColor=white" alt="STM32F722ZE">
-  <img src="https://img.shields.io/badge/comms-LoRa_SX1278-FF6F00?style=for-the-badge" alt="LoRa SX1278">
+  <img src="https://img.shields.io/badge/comms-ESP32_%2B_SIM7600_4G-FF6F00?style=for-the-badge" alt="ESP32 + SIM7600 4G LTE">
   <img src="https://img.shields.io/badge/cloud-Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase">
   <img src="https://img.shields.io/badge/ML-LSTM_%2B_Prophet-FF6F61?style=for-the-badge&logo=tensorflow&logoColor=white" alt="LSTM and Prophet">
   <img src="https://img.shields.io/badge/dashboard-React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18">
@@ -51,7 +51,7 @@ An IoT boat that goes to the water instead of waiting for the water to reach a l
 |  | |
 |:-:|:--|
 | 📡 | **Measures** 10 water-quality parameters with industrial-grade sensors, filtered and calibrated on the edge |
-| 📶 | **Transmits** over LoRa — ~2 km line-of-sight to shore, then 4G LTE to the cloud |
+| 📶 | **Transmits** directly onboard — STM32 sends JSON over 3.3V UART RX–TX to an onboard ESP32 + SIM7600 4G LTE & GNSS module |
 | 🤖 | **Predicts** the Water Quality Index 24 hours ahead with an LSTM trained on CPCB data |
 | 🚨 | **Alerts** authorities via SMS and WhatsApp the moment thresholds break |
 
@@ -63,17 +63,14 @@ An IoT boat that goes to the water instead of waiting for the water to reach a l
 flowchart TB
     RIVER(["🌊 River Environment"])
 
-    subgraph BOAT["📡 Sensor Boat — Edge Node"]
+    subgraph BOAT["📡 Sensor Boat — Edge + Onboard Gateway"]
         direction TB
-        SUITE["<b>Sensor Suite</b><br/>pH · TDS · DO · ORP · DS18B20<br/>BMP280 · BNO085 · NEO-M8N GPS"]
+        SUITE["<b>Sensor Suite</b><br/>pH · TDS · DO · ORP · DS18B20<br/>BMP280 · BNO085 · SIM7600 GNSS"]
         MCU["<b>STM32F722ZE</b><br/>12-bit ADC (2:1 Dividers) · Median Filter<br/>Calibration · JSON Telemetry"]
+        ESP["<b>ESP32-WROOM-32</b><br/>validate · attach GPS + UTC · flash queue"]
+        LTE["<b>SIM7600 4G LTE + GNSS</b><br/>GPS coordinates · HTTPS upload"]
         SUITE --> MCU
-    end
-
-    subgraph SHORE["🏠 Shore Gateway"]
-        direction TB
-        ESP["<b>ESP8266 ESP-12E</b><br/>validate · timestamp · serialize"]
-        LTE["<b>SIM7600E 4G LTE</b><br/>upload"]
+        MCU -->|"UART RX–TX · 115200 8N1 (3.3V)"| ESP
         ESP --> LTE
     end
 
@@ -89,8 +86,7 @@ flowchart TB
     GOV(["🏛️ Local Authorities"])
 
     RIVER --> SUITE
-    MCU -.->|"LoRa SX1278 · 868/915 MHz · ~2 km LoS"| ESP
-    LTE -->|"HTTPS / JSON"| CLOUD
+    LTE -->|"4G LTE · HTTPS / JSON"| CLOUD
     CLOUD --> ML
     CLOUD -->|"real-time"| DASH
     ML -->|"threshold breach"| ALERT
@@ -124,7 +120,7 @@ flowchart TB
 | 🔋 ORP | DFRobot SEN0165 | Redox Potential (`2.0V` midpoint, 20-sample trimmed mean) | ±2000 mV | `PC3` (`ADC1_CH13`, 2:1 divider, 5V rail) |
 | 🌤️ Environment | BMP280 (`0x76`) | Air Temp + Barometric Pressure (DO comp; no RH) | ±1 hPa | `PB8 / PB9` (`I2C1`) |
 | 🧭 IMU | BNO085 (`0x4A`) | Heading / Pitch / Roll | 9-DOF | `PB8 / PB9` (`I2C1`) |
-| 📍 Location | NEO-M8N GNSS | GPS Coordinates / Speed / Course | — | `PC10 / PC11` (`UART4`) |
+| 📍 Location | SIM7600 GNSS *(+ optional NEO-M8N)* | GPS Coordinates / Fix / Speed / Course | — | Onboard ESP32 + SIM7600 *(optional STM32 `UART4`)* |
 | 🌫️ Turbidity *(reserved)* | DFRobot SEN0189 | Suspended Solids (unfitted in current JSON) | 0–3000 NTU | `PC0` (`ADC1_CH10`, 2:1 divider) |
 | ⚡ Conductivity *(reserved)* | DFRobot DFR0300 | EC (K=1, unfitted in current JSON) | 0–20 mS/cm | `PA6` (`ADC1_CH6`, 2:1 divider) |
 
@@ -148,9 +144,9 @@ flowchart TB
 
 **Communication**
 
-`LoRa SX1278`
-`SIM7600E 4G`
-`ESP8266`
+`UART RX–TX`
+`ESP32-WROOM-32`
+`SIM7600 4G + GNSS`
 `AT Commands`
 
 </td>
@@ -192,13 +188,13 @@ flowchart TB
 ## 📊 Communication Protocol
 
 ```
-┌─ LoRa Packet Format ────────────────────────────────────────────────────────────┐
-│ node_id │ timestamp │ lat │ lon │  pH  │ turb │ TDS  │ temp │  DO  │ cond │ CRC │
-│  1 B    │    4 B    │ 4 B │ 4 B │  2 B │  2 B │  2 B │  2 B │  2 B │  2 B │ 2 B │
+┌─ STM32 → Onboard ESP32 UART JSON Line (115200 8N1, \n-terminated) ──────────────┐
+│ {"id","ts","pH","tds_ppm","do_mgl","orp_mv","temp_w1","temp_air",               │
+│  "pressure_hpa","lat","lon","alt_m","sog_knots","cog_deg","gps_fix",...} + \n   │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-   Edge → Gateway    LoRa SX1278 @ 868/915 MHz    ~2 km LoS  ·  ~500 m NLoS
-   Gateway → Cloud   4G LTE, HTTPS + JSON         low bandwidth (~1.5 GB/day)
+   STM32 → ESP32     3.3V UART RX–TX @ 115200 8N1   Direct onboard wire + ACK/NAK
+   ESP32 → Cloud     SIM7600 4G LTE HTTPS POST      Onboard GNSS fix + flash retry queue
 ```
 
 ## 🔋 Power Architecture
@@ -209,7 +205,7 @@ flowchart TB
     MPPT["<b>CN3791 MPPT</b><br/>Charge Controller"]
     BAT["🔋 <b>LiPo Battery</b><br/>3.7V 3000 mAh · 18650"]
     PM["<b>Power Management</b><br/>sleep between waypoints"]
-    LOAD["<b>Loads</b><br/>Sensors · MCU · LoRa · Motors"]
+    LOAD["<b>Loads</b><br/>Sensors · STM32 · ESP32/SIM7600 · Motors"]
 
     SUN -->|"harvest"| MPPT
     MPPT -->|"charge"| BAT
@@ -237,8 +233,8 @@ flowchart LR
         A1["✅ Sensor suite selected"]
         A2["✅ STM32 firmware base"]
         A3["✅ ADC + filtering"]
-        A4["🔄 LoRa telemetry"]
-        A5["🔄 Gateway + cloud"]
+        A4["🔄 STM32 ↔ ESP32 UART link"]
+        A5["🔄 Onboard gateway + cloud"]
         A1 ~~~ A2 ~~~ A3 ~~~ A4 ~~~ A5
     end
 
@@ -254,8 +250,8 @@ flowchart LR
 
     subgraph S3["🛰️ STAGE 3 · Fleet"]
         direction TB
-        C1["Multi-boat mesh"]
-        C2["LoRa mesh network"]
+        C1["Multi-boat coordination"]
+        C2["Multi-node 4G fleet telemetry"]
         C3["On-device TinyML"]
         C4["Public API"]
         C5["Municipal portal"]
@@ -285,7 +281,7 @@ flowchart LR
 
 | Repository | Description | Status |
 |:-----------|:------------|:-------|
-| [**`WQM`**](https://github.com/WQM-Project/WQM) | Core firmware, sensor drivers, LoRa telemetry, and full project documentation | 🟢 Active |
+| [**`WQM`**](https://github.com/WQM-Project/WQM) | Core firmware, sensor drivers, onboard UART → 4G telemetry, and full project documentation | 🟢 Active |
 
 ---
 
