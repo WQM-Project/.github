@@ -65,8 +65,8 @@ flowchart TB
 
     subgraph BOAT["📡 Sensor Boat — Edge Node"]
         direction TB
-        SUITE["<b>Sensor Suite</b><br/>pH · Turbidity · TDS · DO · EC · ORP · Depth<br/>DS18B20 ×2 · BME280 · NEO-6M GPS"]
-        MCU["<b>STM32F722ZE</b><br/>12-bit ADC → Median Filter → Calibration"]
+        SUITE["<b>Sensor Suite</b><br/>pH · TDS · DO · ORP · DS18B20<br/>BMP280 · BNO085 · NEO-M8N GPS"]
+        MCU["<b>STM32F722ZE</b><br/>12-bit ADC (2:1 Dividers) · Median Filter<br/>Calibration · JSON Telemetry"]
         SUITE --> MCU
     end
 
@@ -117,16 +117,16 @@ flowchart TB
 
 | Sensor | Model | Parameter | Range | Interface |
 |:-------|:------|:----------|:------|:----------|
-| 🧪 pH | DFRobot SEN0161 | pH Level | 0–14 pH (±0.1) | Analog |
-| 🌫️ Turbidity | DFRobot SEN0189 | Suspended Solids | 0–3000 NTU | Analog |
-| 💧 TDS | DFRobot SEN0244 | Dissolved Solids | 0–1000 ppm | Analog |
-| 🌡️ Temperature | DS18B20 ×2 | Water Temp | −55 to +125 °C (±0.5) | OneWire |
-| 🫧 Dissolved O₂ | DFRobot SEN0237-A | DO Concentration | 0–20 mg/L | Analog |
-| ⚡ Conductivity | DFRobot DFR0300 | EC (K=1) | 0–20 mS/cm | Analog |
-| 🔋 ORP | DFRobot SEN0165 | Redox Potential | ±2000 mV | Analog |
-| 📏 Depth | JSN-SR04T | Water Level | 20–600 cm | Trig/Echo |
-| 🌤️ Environment | BME280 | Air Temp + Humidity + Pressure | — | I²C |
-| 📍 Location | NEO-6M / M8N | GPS Coordinates | — | UART |
+| 🧪 pH | robu.in Analog pH Kit (SEN0161 V1) | pH Level (`PH_SCALE=4.942f`, `PH_OFFSET=-2.713f`) | 0–14 pH (±0.1) | `PA3` (`ADC1_CH3`, 2:1 divider, 5V rail) |
+| 💧 TDS | DFRobot SEN0244 | Dissolved Solids (`TDS_CAL_K=1.036f`) | 0–1000 ppm | `PA5` (`ADC1_CH5`, 2:1 divider) |
+| 🌡️ Temperature | DS18B20 | Water Temp (`temp_w1`) | −55 to +125 °C (±0.5) | `PE6` (1-Wire, 4.7kΩ pull-up) |
+| 🫧 Dissolved O₂ | Graylogix / DFRobot SEN0237-A | DO Concentration (7.5% KCl, air-cal `764 mV @ 24°C`) | 0–20 mg/L | `PA4` (`ADC1_CH4`, 2:1 divider) |
+| 🔋 ORP | DFRobot SEN0165 | Redox Potential (`2.0V` midpoint, 20-sample trimmed mean) | ±2000 mV | `PC3` (`ADC1_CH13`, 2:1 divider, 5V rail) |
+| 🌤️ Environment | BMP280 (`0x76`) | Air Temp + Barometric Pressure (DO comp; no RH) | ±1 hPa | `PB8 / PB9` (`I2C1`) |
+| 🧭 IMU | BNO085 (`0x4A`) | Heading / Pitch / Roll | 9-DOF | `PB8 / PB9` (`I2C1`) |
+| 📍 Location | NEO-M8N GNSS | GPS Coordinates / Speed / Course | — | `PC10 / PC11` (`UART4`) |
+| 🌫️ Turbidity *(reserved)* | DFRobot SEN0189 | Suspended Solids (unfitted in current JSON) | 0–3000 NTU | `PC0` (`ADC1_CH10`, 2:1 divider) |
+| ⚡ Conductivity *(reserved)* | DFRobot DFR0300 | EC (K=1, unfitted in current JSON) | 0–20 mS/cm | `PA6` (`ADC1_CH6`, 2:1 divider) |
 
 ---
 
